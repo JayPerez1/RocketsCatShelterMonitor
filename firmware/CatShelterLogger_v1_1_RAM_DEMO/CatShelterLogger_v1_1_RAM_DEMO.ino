@@ -1,27 +1,8 @@
 /*
   Cat Shelter Monitor - RAM DEMO Logger (NO FRAM)
-  Purpose: PoC demo when FRAM hardware is unavailable.
+  PoC demo: BLE download works even without FRAM hardware.
 
-  Hardware (same as production where possible):
-  - Adafruit Feather nRF52840 Express
-  - DS3231 RTC (I2C) OPTIONAL (works if connected; otherwise ts=0)
-  - 2x DS18B20 on A2 (shared 1-Wire bus, external pull-up to 3V)
-
-  Storage:
-  - RAM ONLY (volatile). Data lost on reset/power loss.
-
-  BLE:
-  - Adafruit Bluefruit LE UART service.
-  - User-facing commands:
-      HELP
-      STATUS
-      DOWNLOAD      (CSV since last download)
-      DOWNLOADALL   (CSV all in RAM)
-      CLEAR         (clears RAM buffer + indexes)
-
-  Output:
-  - Pure CSV only (no BEGIN/END wrappers)
-  - Ends with: DOWNLOAD_COMPLETE,<sent>,<remaining>
+  CSV is intentionally SHORT to avoid BLE terminal truncation.
 */
 
 #include <Arduino.h>
@@ -40,8 +21,7 @@ static const uint8_t PIN_DS18B20 = A2;
 static const uint32_t LOG_INTERVAL_MS = 60UL * 1000UL; // 1 minute
 
 // -------------------- RAM storage (DEMO) --------------------
-// User selected: 1440 records (~24 hours at 1-min interval)
-static const uint32_t RAM_MAX_RECORDS = 1440;
+static const uint32_t RAM_MAX_RECORDS = 1440; // 24 hours @ 1-min
 
 struct __attribute__((packed)) Record {
   uint32_t ts;          // Unix time (seconds); 0 if RTC missing
@@ -51,9 +31,8 @@ struct __attribute__((packed)) Record {
 
 static Record records[RAM_MAX_RECORDS];
 
-// Indexes (mirror your FRAM semantics as much as possible)
-static uint32_t write_index = 0;                 // next record index to write
-static uint32_t last_sent_index = 0xFFFFFFFFUL;  // last record index sent via DOWNLOAD
+static uint32_t write_index = 0;
+static uint32_t last_sent_index = 0xFFFFFFFFUL;
 
 // -------------------- Globals --------------------
 RTC_DS3231 rtc;
@@ -80,7 +59,6 @@ static void disableOnboardNeoPixel() {
 }
 
 static float cFromX100(int16_t v) { return ((float)v) / 100.0f; }
-static float fFromC(float c) { return c * 9.0f / 5.0f + 32.0f; }
 
 static void blePrintln(const char* s) { bleuart.println(s); }
 
@@ -100,31 +78,21 @@ static void printHelp() {
   blePrintln("  HELP");
 }
 
-static void sendCsvHeader() {
-  blePrintln("ts_iso,ts_unix,probe0_C,probe0_F,probe1_C,probe1_F");
+// SHORT CSV header to avoid truncation in apps
+static void sendCsvHeaderShort() {
+  blePrintln("ts_unix,t0C,t1C");
   delay(50);
 }
 
-static void sendCsvRecordLine(const Record& r) {
-  // ISO time: if ts==0, show 1970-01-01 for clarity
-  DateTime dt((uint32_t)r.ts);
-
-  char iso[25];
-  snprintf(iso, sizeof(iso), "%04d-%02d-%02d %02d:%02d:%02d",
-           dt.year(), dt.month(), dt.day(),
-           dt.hour(), dt.minute(), dt.second());
-
+static void sendCsvRecordLineShort(const Record& r) {
   float t0c = cFromX100(r.t0_c_x100);
   float t1c = cFromX100(r.t1_c_x100);
-  float t0f = fFromC(t0c);
-  float t1f = fFromC(t1c);
 
-  bleuart.print(iso); bleuart.print(",");
-  bleuart.print(r.ts); bleuart.print(",");
-  bleuart.print(t0c, 2); bleuart.print(",");
-  bleuart.print(t0f, 2); bleuart.print(",");
-  bleuart.print(t1c, 2); bleuart.print(",");
-  bleuart.println(t1f, 2);
+  bleuart.print((uint32_t)r.ts);
+  bleuart.print(",");
+  bleuart.print(t0c, 2);
+  bleuart.print(",");
+  bleuart.println(t1c, 2);
 }
 
 static uint32_t sendCsvRangeChunked(uint32_t startIndex, uint32_t endIndexInclusive) {
@@ -132,11 +100,11 @@ static uint32_t sendCsvRangeChunked(uint32_t startIndex, uint32_t endIndexInclus
 
   uint32_t sent = 0;
 
-  sendCsvHeader();
+  sendCsvHeaderShort();
 
   for (uint32_t i = startIndex; i <= endIndexInclusive; i++) {
-    if (i >= write_index) break; // safety
-    sendCsvRecordLine(records[i]);
+    if (i >= write_index) break;
+    sendCsvRecordLineShort(records[i]);
     sent++;
 
     delay(CSV_LINE_DELAY_MS);
@@ -161,10 +129,7 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
 
 // -------------------- Logging --------------------
 static void doLogOnce() {
-  if (write_index >= RAM_MAX_RECORDS) {
-    // Stop logging when full (demo behavior)
-    return;
-  }
+  if (write_index >= RAM_MAX_RECORDS) return;
 
   ds18b20.requestTemperatures();
 
@@ -221,18 +186,12 @@ static void doDownloadNew() {
   uint32_t endIndex = write_index - 1;
   uint32_t sent = sendCsvRangeChunked(start, endIndex);
 
-  if (sent > 0) {
-    last_sent_index = endIndex;
-  }
+  if (sent > 0) last_sent_index = endIndex;
 
   uint32_t remaining = 0;
-  if (last_sent_index == 0xFFFFFFFFUL) {
-    remaining = write_index;
-  } else if (last_sent_index + 1 < write_index) {
-    remaining = write_index - (last_sent_index + 1);
-  } else {
-    remaining = 0;
-  }
+  if (last_sent_index == 0xFFFFFFFFUL) remaining = write_index;
+  else if (last_sent_index + 1 < write_index) remaining = write_index - (last_sent_index + 1);
+  else remaining = 0;
 
   printDownloadComplete(sent, remaining);
 }
@@ -258,9 +217,9 @@ static void handleCommand(String cmd) {
   if (cmd == "HELP") { printHelp(); return; }
 
   if (cmd == "STATUS") {
-    bleuart.print("write_index=");      bleuart.println(write_index);
-    bleuart.print("last_sent_index=");  bleuart.println(last_sent_index);
-    bleuart.print("max_records=");      bleuart.println((uint32_t)RAM_MAX_RECORDS);
+    bleuart.print("write_index=");     bleuart.println((uint32_t)write_index);
+    bleuart.print("last_sent_index="); bleuart.println((uint32_t)last_sent_index);
+    bleuart.print("max_records=");     bleuart.println((uint32_t)RAM_MAX_RECORDS);
 
     bleuart.print("rtc_unix=");
     if (rtc_ok) {
@@ -270,9 +229,9 @@ static void handleCommand(String cmd) {
       bleuart.println((uint32_t)0);
     }
 
-    bleuart.print("fram_ok="); bleuart.println(0);            // explicitly bypassed
-    bleuart.print("rtc_ok=");  bleuart.println(rtc_ok ? 1 : 0);
-    bleuart.print("ram_only="); bleuart.println(1);
+    bleuart.println("fram_ok=0");
+    bleuart.print("rtc_ok=");   bleuart.println(rtc_ok ? 1 : 0);
+    bleuart.println("ram_only=1");
     return;
   }
 
@@ -297,9 +256,8 @@ void setup() {
   delay(500);
 
   Serial.println();
-  Serial.println("Cat Shelter Monitor - RAM DEMO");
+  Serial.println("Cat Shelter Monitor - RAM DEMO (short CSV)");
 
-  // RTC (optional)
   Wire.begin();
   rtc_ok = rtc.begin();
   if (rtc_ok) {
@@ -312,14 +270,9 @@ void setup() {
     Serial.println("RTC NOT FOUND (OK for demo).");
   }
 
-  // DS18B20
   ds18b20.begin();
   ds18b20.setWaitForConversion(true);
-  int count = ds18b20.getDeviceCount();
-  Serial.print("DS18B20 devices found: ");
-  Serial.println(count);
 
-  // BLE
   Bluefruit.begin();
   Bluefruit.setTxPower(4);
   Bluefruit.setName("CatShelterLogger");
