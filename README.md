@@ -1,6 +1,7 @@
 # Cat Shelter Monitor
 
-Battery-powered temperature data logger to monitor temperatures and occupancy in feral cat shelters.
+Battery-powered temperature data logger to monitor temperatures and occupency in an outdoor feral cat shelter.
+
 
 ## Hardware (verified)
 - Adafruit Feather nRF52840 Express
@@ -13,5 +14,6 @@ Battery-powered temperature data logger to monitor temperatures and occupancy in
 - v1.0: Logging + BLE UART commands (STATUS / GETNEW / GETALL / CLEAR)
 
 ## Docs
-See `docs/session-continuity.md`.
-
+- `docs/session-continuity.md`
+- `docs/cat-shelter-chat-bootstrap.md`
+- `docs/Cat_Shelter_BOM_v4.xlsx`
