@@ -44,6 +44,9 @@ DallasTemperature ds18b20(&oneWire);
 BLEUart bleuart;
 
 static uint32_t last_log_ms = 0;
+static float last_t0 = NAN;
+static float last_t1 = NAN;
+static int   last_probe_count = -1;
 
 // -------------------- Transfer pacing --------------------
 static const uint16_t CSV_LINE_DELAY_MS = 3;
@@ -63,7 +66,7 @@ static float cFromX100(int16_t v) { return ((float)v) / 100.0f; }
 static void blePrintln(const char* s) { bleuart.println(s); }
 
 static void printWelcome() {
-  blePrintln("Cat Shelter Logger (RAM DEMO)");
+  blePrintln("Cat Shelter Logger (RAM DEMO) FW=2026-01-16-A");
   blePrintln("Type: DOWNLOAD");
   blePrintln("Also: STATUS, HELP");
   blePrintln("NOTE: RAM ONLY (data lost on reset)");
@@ -120,6 +123,8 @@ static uint32_t sendCsvRangeChunked(uint32_t startIndex, uint32_t endIndexInclus
 void connect_callback(uint16_t conn_handle) {
   (void)conn_handle;
   printWelcome();
+  // Take an immediate sample so STATUS shows real values right away
+  doLogOnce();
 }
 
 void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
@@ -133,8 +138,12 @@ static void doLogOnce() {
 
   ds18b20.requestTemperatures();
 
-  float t0 = ds18b20.getTempCByIndex(0);
-  float t1 = ds18b20.getTempCByIndex(1);
+ last_probe_count = ds18b20.getDeviceCount();
+ last_t0 = ds18b20.getTempCByIndex(0);
+ last_t1 = ds18b20.getTempCByIndex(1);
+
+float t0 = last_t0;
+float t1 = last_t1;
 
   bool ok0 = (t0 > -100.0f);
   bool ok1 = (t1 > -100.0f);
@@ -217,9 +226,13 @@ static void handleCommand(String cmd) {
   if (cmd == "HELP") { printHelp(); return; }
 
   if (cmd == "STATUS") {
+    bleuart.println("fw_id=2026-01-16-A");
     bleuart.print("write_index=");     bleuart.println((uint32_t)write_index);
     bleuart.print("last_sent_index="); bleuart.println((uint32_t)last_sent_index);
     bleuart.print("max_records=");     bleuart.println((uint32_t)RAM_MAX_RECORDS);
+    bleuart.print("ds18b20_count="); bleuart.println(last_probe_count);
+    bleuart.print("last_t0="); bleuart.println(last_t0);
+    bleuart.print("last_t1="); bleuart.println(last_t1);
 
     bleuart.print("rtc_unix=");
     if (rtc_ok) {
