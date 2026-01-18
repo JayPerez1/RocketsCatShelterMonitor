@@ -254,3 +254,12 @@ FRAM: ? pending replacement
 GitHub: ? clean, recoverable, well-branched
 
 Project is stable, demo-ready, and correctly staged for FRAM reintegration.
+
+PCB v1 Carrier (KiCad 9.0.7) – Schematic Progress
+- Feather headers, FRAM socket, RTC socket, 2x probe terminals, and expansion header are placed and wired.
+- Expansion header nets wired: +3V3, GND, A3, A4, D5, D6.
+- ERC: All real connectivity issues resolved.
+- ERC power-source complaints for carrier-board power (external from Feather) were excluded with comments:
+  "Carrier board: power supplied externally by Feather"
+  Excluded items included: Pin not connected / Input power not driven related to power symbols/flags.
+- Next step: Assign footprints and then update PCB layout from schematic.
