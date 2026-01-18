@@ -1,6 +1,8 @@
 Session Continuity – Cat Shelter Monitor
 
-Last updated: 2026-01-17
+Last updated: 2026-01-18
+
+CRITICAL: If your instructions become inaccurate, ambiguous, or rely on unverified UI behavior, STOP, restate my constraints, and reset before continuing.
 
 1. Check out repository: RocketsCatShelterMonitor
 2. Switch to branch: v1.1-demo-ram-buffer
