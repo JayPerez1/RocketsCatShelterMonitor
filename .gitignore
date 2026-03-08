@@ -3,3 +3,56 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# ================================
+# VSCode
+# ================================
+.vscode/
+*.code-workspace
+
+# ================================
+# PlatformIO
+# ================================
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# ================================
+# Arduino / firmware backups
+# ================================
+*.BACK
+*.BACKUP
+*.MASTER
+* - Copy.ino
+*-Copy.ino
+
+# ================================
+# KiCad temporary / generated
+# ================================
+*-backups/
+*_backups/
+*.lck
+~*.lck
+fp-info-cache
+ImportLog.log
+
+# KiCad autosave files
+_autosave*
+*.kicad_sch-bak
+*.kicad_pcb-bak
+*.kicad_pro-bak
+
+# KiCad local settings (user specific)
+*.kicad_prl
+
+# ================================
+# Windows junk
+# ================================
+Thumbs.db
+Desktop.ini
+
+# ================================
+# Logs / temporary files
+# ================================
+*.log
+*.tmp
