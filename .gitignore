@@ -4,6 +4,11 @@
 .vscode/launch.json
 .vscode/ipch
 
+*-backups/
+ImportLog.log
+fp-info-cache
+*.zip
+
 # ================================
 # VSCode
 # ================================
